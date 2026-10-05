@@ -11,8 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cat.strategy = WanderStrategy()
         cat.speed = 4
         cat.idleAnimationOdds = 50
-        // Placeholder look until the lazy cat gets its own sprite sheet.
-        cat.variant = SpriteVariant(rawValue: "black") ?? .cat
+        cat.variant = .pierre
         return cat
     }()
     private var statusItem: NSStatusItem!
