@@ -5,6 +5,10 @@ import AppKit
 /// horizontal-only mode; the animation/direction code never branches on mode.
 protocol TargetStrategy {
     func target(forMouse mouse: CGPoint) -> CGPoint
+    /// Called by the controller each tick; `cat` is the cat's current center.
+    /// Strategies that don't care where the cat is only implement the
+    /// single-argument version.
+    func target(forMouse mouse: CGPoint, cat: CGPoint) -> CGPoint
     /// Whether the cat is close enough to its target to stop and idle.
     /// `dx`/`dy` are target minus cat position; `threshold` is the classic
     /// oneko stop distance.
@@ -12,6 +16,10 @@ protocol TargetStrategy {
 }
 
 extension TargetStrategy {
+    func target(forMouse mouse: CGPoint, cat: CGPoint) -> CGPoint {
+        target(forMouse: mouse)
+    }
+
     func isSettled(dx: CGFloat, dy: CGFloat, threshold: CGFloat) -> Bool {
         (dx * dx + dy * dy).squareRoot() < threshold
     }
@@ -80,5 +88,38 @@ struct HorizontalPinnedStrategy: TargetStrategy {
     /// pinned row — otherwise it stops a few pixels off the edge.
     func isSettled(dx: CGFloat, dy: CGFloat, threshold: CGFloat) -> Bool {
         abs(dx) < threshold && abs(dy) < 1
+    }
+}
+
+/// The lazy cat: ignores the cursor. It sits where it is and, every few
+/// minutes, picks a random spot on the screen it's on and strolls there.
+final class WanderStrategy: TargetStrategy {
+    /// Seconds between strolls.
+    private let interval: ClosedRange<TimeInterval> = 90...300
+    private var spot: CGPoint?
+    /// The first stroll comes sooner, so the cat shows it can move.
+    private var nextStroll = Date().addingTimeInterval(.random(in: 20...60))
+
+    /// Unused: the controller always asks with the cat's position.
+    func target(forMouse mouse: CGPoint) -> CGPoint { spot ?? mouse }
+
+    func target(forMouse mouse: CGPoint, cat: CGPoint) -> CGPoint {
+        let now = Date()
+        if now >= nextStroll {
+            spot = Self.randomSpot(near: cat)
+            nextStroll = now.addingTimeInterval(.random(in: interval))
+        }
+        if let spot = spot { return spot }
+        spot = cat
+        return cat
+    }
+
+    /// Somewhere on the cat's current screen, clear of the menu bar and Dock.
+    private static func randomSpot(near cat: CGPoint) -> CGPoint {
+        let area = screenContaining(cat).visibleFrame
+            .insetBy(dx: SpriteSheet.frameSize, dy: SpriteSheet.frameSize)
+        guard area.width > 0, area.height > 0 else { return cat }
+        return CGPoint(x: .random(in: area.minX...area.maxX),
+                       y: .random(in: area.minY...area.maxY))
     }
 }

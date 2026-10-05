@@ -86,6 +86,9 @@ compatible with it.
 Everything lives in the menu bar item (cat icon) — there is no settings
 window, no onboarding, no Dock icon. Just the cat.
 
+- **Two cats**: the chaser follows your cursor; the lazy cat ignores it,
+  naps a lot and strolls to a new spot on its screen every few minutes. Show
+  or hide each one from the menu.
 - **Click-through overlay** — borderless and transparent; the cat never
   intercepts a click and renders above every app, including full-screen apps,
   on all Spaces.
@@ -169,7 +172,8 @@ top -l 3 -pid $(pgrep -x MonsieurPierre) -stats cpu,power,mem
 - `Sources/CatController.swift` — timer + state machine (port of oneko.js logic,
   adapted to AppKit's y-up coordinates)
 - `Sources/TargetStrategy.swift` — the single swappable target-position piece:
-  `FullChaseStrategy` (classic 2D) vs `HorizontalPinnedStrategy` (pinned row)
+  `FullChaseStrategy` (classic 2D), `HorizontalPinnedStrategy` (pinned row)
+  and `WanderStrategy` (the lazy cat)
 - `Sources/CatWindow.swift` — transparent click-through overlay window
 - `Sources/SpriteSheet.swift` — slices the 256×128 sheets into frames; the
   sprite variant catalog (with menu grouping) lives here

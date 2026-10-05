@@ -17,6 +17,9 @@ final class CatController {
     var variant: SpriteVariant = .cat {
         didSet { wake() }
     }
+    /// 1-in-N chance per idle tick of starting a sleep or scratch animation;
+    /// oneko.js uses 200. Lower means a sleepier cat.
+    var idleAnimationOdds = 200
 
     private var pos: CGPoint
     private var frameCount = 0
@@ -24,9 +27,10 @@ final class CatController {
     private var idleAnimation: String?
     private var idleAnimationFrame = 0
 
-    init() {
+    /// Starts at `position`, or the middle of the main screen.
+    init(position: CGPoint? = nil) {
         let screen = NSScreen.main?.frame ?? .init(x: 0, y: 0, width: 800, height: 600)
-        pos = CGPoint(x: screen.midX, y: screen.midY)
+        pos = position ?? CGPoint(x: screen.midX, y: screen.midY)
     }
 
     func start() {
@@ -70,7 +74,7 @@ final class CatController {
     }
 
     private func tick() {
-        let target = strategy.target(forMouse: NSEvent.mouseLocation)
+        let target = strategy.target(forMouse: NSEvent.mouseLocation, cat: pos)
         frameCount += 1
 
         let dx = target.x - pos.x
@@ -117,7 +121,7 @@ final class CatController {
 
         // Rarely start a one-off idle animation (sleep, wash, or scratch a
         // nearby screen edge) — same odds as oneko.js.
-        if idleTime > 10, Int.random(in: 0..<200) == 0, idleAnimation == nil {
+        if idleTime > 10, Int.random(in: 0..<idleAnimationOdds) == 0, idleAnimation == nil {
             var options = ["sleeping", "scratchSelf"]
             let bounds = screenContaining(pos).frame
             if pos.x < bounds.minX + 32 { options.append("scratchWallW") }
