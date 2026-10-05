@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let clipboard = ClipboardHolder()
     private let mail = MailWatch()
     private let bubble = SpeechBubble()
+    private let redditJokes = RedditJokes()
     private var jokeTimer: Timer?
     private let lazyCat: CatController = {
         let screen = NSScreen.main?.visibleFrame ?? .init(x: 0, y: 0, width: 800, height: 600)
@@ -37,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let clipboard = "lazyCatHoldsClipboard"
         static let mail = "lazyCatWatchesMail"
         static let jokes = "lazyCatTellsJokes"
+        static let redditJokes = "jokesFromReddit"
         static let startle = "startle"
         static let reactions = "reactions"
     }
@@ -48,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var clipboardItem: NSMenuItem!
     private var mailItem: NSMenuItem!
     private var jokesItem: NSMenuItem!
+    private var redditItem: NSMenuItem!
     private var horizontalItem: NSMenuItem!
     private var spaceItems: [NSMenuItem] = []
     private var startleItem: NSMenuItem!
@@ -237,6 +240,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                 action: #selector(toggleMail), keyEquivalent: "")
         jokesItem = menu.addItem(withTitle: "Lazy Cat Tells Jokes",
                                  action: #selector(toggleJokes), keyEquivalent: "")
+        redditItem = menu.addItem(withTitle: "Fresh Jokes from Reddit",
+                                  action: #selector(toggleReddit), keyEquivalent: "")
+        redditItem.indentationLevel = 1
         menu.addItem(withTitle: "Quit Monsieur Pierre", action: #selector(quit), keyEquivalent: "q")
 
         for item in menu.items { item.target = self }
@@ -351,6 +357,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         defaults.object(forKey: Keys.jokes) as? Bool ?? true
     }
 
+    /// On by default (joe's pick); the built-in jokes cover offline time.
+    private var jokesFromReddit: Bool {
+        defaults.object(forKey: Keys.redditJokes) as? Bool ?? true
+    }
+
     private var reactions: Bool {
         defaults.object(forKey: Keys.reactions) as? Bool ?? true
     }
@@ -408,6 +419,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clipboardItem.state = holdsClipboard ? .on : .off
         mailItem.state = watchesMail ? .on : .off
         jokesItem.state = tellsJokes ? .on : .off
+        redditItem.state = jokesFromReddit ? .on : .off
         let horizontal = defaults.bool(forKey: Keys.horizontal)
         horizontalItem.state = horizontal ? .on : .off
         topItem.state = dockEdge == .top ? .on : .off
@@ -548,6 +560,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clipboard.isEnabled = holdsClipboard && lazyCat.isRunning
         mail.isEnabled = watchesMail && lazyCat.isRunning
         if !lazyCat.isRunning || !tellsJokes { bubble.dismiss() }
+        redditJokes.isEnabled = tellsJokes && jokesFromReddit && lazyCat.isRunning
     }
 
     /// Right-click on the lazy cat: unread mail first (when watching), then
@@ -682,6 +695,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleJokes() {
         defaults.set(!tellsJokes, forKey: Keys.jokes)
+        applySettings()
+        refreshMenuState()
+    }
+
+    @objc private func toggleReddit() {
+        defaults.set(!jokesFromReddit, forKey: Keys.redditJokes)
         applySettings()
         refreshMenuState()
     }

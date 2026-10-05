@@ -122,7 +122,10 @@ window, no onboarding, no Dock icon. Just the cat.
   macOS asks once for permission to control Mail.
 - **Jokes** (lazy cat, on by default): every 20 to 45 minutes he wakes up
   long enough to tell a cat joke or a dad joke in a little speech bubble.
-  About 100 are built in and work offline; right-click him for "Tell Me a
+  With "Fresh Jokes from Reddit" on (the default) they come from the top
+  posts of r/dadjokes, r/cleanjokes and r/catpuns, fetched every six hours
+  (short text posts only, nothing marked NSFW). About 100 are also built in
+  for when Reddit can't be reached; right-click him for "Tell Me a
   Joke", or "Add Your Own Jokes…" to edit
   `~/Library/Application Support/Monsieur Pierre/jokes.txt` (one per line).
   New mail gets a "You've got mail!" bubble too. Click him to dismiss a
