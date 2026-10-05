@@ -48,7 +48,7 @@ final class CatController {
         timer?.invalidate()
         timer = nil
         window.orderOut(nil)
-        if let activity { ProcessInfo.processInfo.endActivity(activity) }
+        if let activity = activity { ProcessInfo.processInfo.endActivity(activity) }
         activity = nil
     }
 

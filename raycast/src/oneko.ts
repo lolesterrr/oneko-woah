@@ -4,8 +4,8 @@ import { promisify } from "node:util";
 
 const execAsync = promisify(exec);
 
-export const BREW_COMMAND = "brew install --cask oneko-swift/tap/oneko";
-const BUNDLE_ID = "app.oneko.oneko";
+export const RELEASES_URL = "https://github.com/lolesterrr/oneko-woah/releases/latest";
+const BUNDLE_ID = "com.lolesterrr.monsieurpierre";
 
 /// All control goes through the app's oneko:// URL scheme; `open` also
 /// launches the app when it isn't running yet.
@@ -19,16 +19,16 @@ export async function onekoInstalled(): Promise<boolean> {
 }
 
 /// Guard for every command: without the app installed there is nothing to
-/// control, so point at the Homebrew cask instead.
+/// control, so point at the releases page instead.
 export async function requireOneko(): Promise<boolean> {
   if (await onekoInstalled()) return true;
   await showToast({
     style: Toast.Style.Failure,
-    title: "Oneko is not installed",
-    message: BREW_COMMAND,
+    title: "Monsieur Pierre is not installed",
+    message: RELEASES_URL,
     primaryAction: {
-      title: "Copy Brew Command",
-      onAction: () => Clipboard.copy(BREW_COMMAND),
+      title: "Copy Download Link",
+      onAction: () => Clipboard.copy(RELEASES_URL),
     },
   });
   return false;
@@ -36,7 +36,7 @@ export async function requireOneko(): Promise<boolean> {
 
 export async function onekoRunning(): Promise<boolean> {
   try {
-    await execAsync("pgrep -x Oneko");
+    await execAsync("pgrep -x MonsieurPierre");
     return true;
   } catch {
     return false;
@@ -47,7 +47,7 @@ export async function onekoRunning(): Promise<boolean> {
 /// pickers. Returns undefined when the key was never written.
 export async function readSetting(key: string): Promise<string | undefined> {
   try {
-    const { stdout } = await execAsync(`defaults read app.oneko.Oneko ${key}`);
+    const { stdout } = await execAsync(`defaults read com.lolesterrr.monsieurpierre ${key}`);
     return stdout.trim();
   } catch {
     return undefined;

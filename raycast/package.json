@@ -1,8 +1,8 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "oneko",
-  "title": "Oneko",
-  "description": "Control Oneko, the desktop cat that chases your cursor.",
+  "title": "Monsieur Pierre",
+  "description": "Control Monsieur Pierre, the desktop cat that chases your cursor.",
   "icon": "icon.png",
   "author": "miklw",
   "categories": [
@@ -16,7 +16,7 @@
     {
       "name": "toggle",
       "title": "Toggle Cat",
-      "description": "Show or hide the cat, starting Oneko if needed.",
+      "description": "Show or hide the cat, starting Monsieur Pierre if needed.",
       "mode": "no-view"
     },
     {
@@ -33,8 +33,8 @@
     },
     {
       "name": "quit",
-      "title": "Quit Oneko",
-      "description": "Quit the Oneko app.",
+      "title": "Quit Monsieur Pierre",
+      "description": "Quit the Monsieur Pierre app.",
       "mode": "no-view"
     }
   ],

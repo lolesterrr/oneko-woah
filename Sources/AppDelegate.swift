@@ -1,5 +1,4 @@
 import AppKit
-import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let cat = CatController()
@@ -15,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let display = "lockedDisplay"
         static let displayName = "lockedDisplayName"
         static let displayUUID = "lockedDisplayUUID"
+        static let loginItemDefaulted = "loginItemDefaulted"
     }
 
     // Menu items whose state we refresh.
@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        enableLaunchAtLoginOnFirstRun()
         reconcileLockedDisplay()
         setUpStatusItem()
         applySettings()
@@ -98,11 +99,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setUpStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         // Fallbacks if the bundled icon is missing: cat.fill needs macOS 14,
-        // pawprint.fill covers 13.
+        // pawprint.fill covers 11.
         if let icon = Self.makeStatusIcon() {
             statusItem.button?.image = icon
-        } else if let icon = NSImage(systemSymbolName: "cat.fill", accessibilityDescription: "Oneko")
-            ?? NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Oneko") {
+        } else if let icon = NSImage(systemSymbolName: "cat.fill", accessibilityDescription: "Monsieur Pierre")
+            ?? NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Monsieur Pierre") {
             statusItem.button?.image = icon
         } else {
             statusItem.button?.title = "🐱"
@@ -164,7 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         showHideItem = menu.addItem(withTitle: "Hide Cat",
                             action: #selector(toggleShown), keyEquivalent: "")
-        menu.addItem(withTitle: "Quit Oneko", action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit Monsieur Pierre", action: #selector(quit), keyEquivalent: "q")
 
         for item in menu.items { item.target = self }
         for item in speedItems + variantItems + [topItem!, bottomItem!] { item.target = self }
@@ -230,7 +231,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ctx.draw(cg, in: rect)
             return true
         }
-        icon.accessibilityDescription = "Oneko"
+        icon.accessibilityDescription = "Monsieur Pierre"
         return icon
     }
 
@@ -307,7 +308,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.state = (item.representedObject as? Int) == lockedDisplayID.map(Int.init)
                 ? .on : .off
         }
-        loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        loginItem.state = LoginItem.isEnabled ? .on : .off
     }
 
     // MARK: - Actions
@@ -379,15 +380,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleLaunchAtLogin() {
         do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
+            try LoginItem.setEnabled(!LoginItem.isEnabled)
         } catch {
             NSLog("Launch at login toggle failed: \(error)")
         }
         refreshMenuState()
+    }
+
+    /// Launch at Login is on by default: turned on once, at first launch.
+    /// Turning it off in the menu sticks, since this never runs again.
+    private func enableLaunchAtLoginOnFirstRun() {
+        guard !defaults.bool(forKey: Keys.loginItemDefaulted) else { return }
+        defaults.set(true, forKey: Keys.loginItemDefaulted)
+        do {
+            try LoginItem.setEnabled(true)
+        } catch {
+            NSLog("Enabling launch at login failed: \(error)")
+        }
     }
 
     @objc private func quit() {

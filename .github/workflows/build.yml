@@ -1,0 +1,25 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build universal app
+        run: ./build.sh
+
+      - name: Check macOS 11 deployment target
+        run: |
+          EXE="build/Monsieur Pierre.app/Contents/MacOS/MonsieurPierre"
+          for arch in arm64 x86_64; do
+            minos=$(vtool -arch "$arch" -show-build "$EXE" | awk '/minos/ {print $2}')
+            echo "$arch minos=$minos"
+            [ "$minos" = "11.0" ] || { echo "expected minos 11.0 for $arch"; exit 1; }
+          done
+          plutil -extract LSMinimumSystemVersion raw "build/Monsieur Pierre.app/Contents/Info.plist" | grep -qx 11.0
