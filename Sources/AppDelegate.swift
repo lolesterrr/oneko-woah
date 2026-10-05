@@ -28,12 +28,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let displayUUID = "lockedDisplayUUID"
         static let loginItemDefaulted = "loginItemDefaulted"
         static let lazyHidden = "lazyCatHidden"
+        static let personalSpace = "personalSpace"
+        static let startle = "startle"
     }
 
     // Menu items whose state we refresh.
     private var showHideItem: NSMenuItem!
     private var lazyShowHideItem: NSMenuItem!
     private var horizontalItem: NSMenuItem!
+    private var spaceItems: [NSMenuItem] = []
+    private var startleItem: NSMenuItem!
     private var topItem: NSMenuItem!
     private var bottomItem: NSMenuItem!
     private var speedItems: [NSMenuItem] = []
@@ -44,6 +48,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private static let speeds: [(String, CGFloat)] = [
         ("Slow", 5), ("Normal", 10), ("Fast", 20),
+    ]
+    /// How far from the cursor the chaser stops; 0 is the classic oneko
+    /// behaviour of curling up right next to it.
+    private static let spaces: [(String, CGFloat)] = [
+        ("Off (Classic)", 0), ("Close", 50), ("Comfortable", 75), ("Far", 100),
     ]
 
     /// URLs can arrive before applicationDidFinishLaunching when the app is
@@ -161,6 +170,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let displayItem = menu.addItem(withTitle: "Display", action: nil, keyEquivalent: "")
         displayItem.submenu = displayMenu
 
+        let spaceMenu = NSMenu()
+        for (name, value) in Self.spaces {
+            let item = spaceMenu.addItem(withTitle: name,
+                                         action: #selector(setPersonalSpace(_:)), keyEquivalent: "")
+            item.representedObject = value
+            spaceItems.append(item)
+        }
+        let spaceItem = menu.addItem(withTitle: "Personal Space", action: nil, keyEquivalent: "")
+        spaceItem.submenu = spaceMenu
+        startleItem = menu.addItem(withTitle: "Startled by Fast Moves",
+                                   action: #selector(toggleStartle), keyEquivalent: "")
+
         horizontalItem = menu.addItem(withTitle: "Horizontal-Only Mode",
                                       action: #selector(toggleHorizontal), keyEquivalent: "")
         let edgeMenu = NSMenu()
@@ -187,7 +208,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Quit Monsieur Pierre", action: #selector(quit), keyEquivalent: "q")
 
         for item in menu.items { item.target = self }
-        for item in speedItems + variantItems + [topItem!, bottomItem!] { item.target = self }
+        for item in speedItems + spaceItems + variantItems + [topItem!, bottomItem!] {
+            item.target = self
+        }
         statusItem.menu = menu
     }
 
@@ -268,6 +291,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         defaults.object(forKey: Keys.speed) as? Double ?? 10
     }
 
+    /// Defaults to Comfortable: the cat keeps you company rather than
+    /// sitting on the cursor.
+    private var personalSpace: Double {
+        defaults.object(forKey: Keys.personalSpace) as? Double ?? 75
+    }
+
+    private var startles: Bool {
+        defaults.object(forKey: Keys.startle) as? Bool ?? true
+    }
+
     /// UInt32(exactly:) guards against out-of-range values from a corrupted
     /// plist or a manual `defaults write`; invalid means unlocked.
     private var lockedDisplayID: CGDirectDisplayID? {
@@ -299,6 +332,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applySettings() {
         cat.speed = CGFloat(speed)
+        cat.personalSpace = CGFloat(personalSpace)
+        cat.startles = startles
         cat.variant = spriteVariant
         var strategy: TargetStrategy = defaults.bool(forKey: Keys.horizontal)
             ? HorizontalPinnedStrategy(edge: dockEdge)
@@ -321,6 +356,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for item in speedItems {
             item.state = (item.representedObject as? CGFloat) == CGFloat(speed) ? .on : .off
         }
+        for item in spaceItems {
+            item.state = (item.representedObject as? CGFloat) == CGFloat(personalSpace)
+                ? .on : .off
+        }
+        startleItem.state = startles ? .on : .off
         for item in variantItems {
             item.state = (item.representedObject as? String) == spriteVariant.rawValue ? .on : .off
         }
@@ -387,6 +427,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             defaults.removeObject(forKey: Keys.displayName)
             defaults.removeObject(forKey: Keys.displayUUID)
         }
+        applySettings()
+        refreshMenuState()
+    }
+
+    @objc private func setPersonalSpace(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? CGFloat else { return }
+        defaults.set(Double(value), forKey: Keys.personalSpace)
+        applySettings()
+        refreshMenuState()
+    }
+
+    @objc private func toggleStartle() {
+        defaults.set(!startles, forKey: Keys.startle)
         applySettings()
         refreshMenuState()
     }
