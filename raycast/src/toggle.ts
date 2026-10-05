@@ -5,7 +5,7 @@ export default async function command() {
   if (!(await requireOneko())) return;
   if (!(await onekoRunning())) {
     await send("show");
-    await showHUD("Oneko started");
+    await showHUD("Monsieur Pierre started");
     return;
   }
   // catHidden reflects the state before the toggle; absent means shown.

@@ -1,63 +1,53 @@
-# oneko-swift — native macOS port of oneko
+# Monsieur Pierre — a desktop cat for macOS
 
-A native Swift/AppKit port of the classic [oneko](https://github.com/adryd325/oneko.js):
+Monsieur Pierre is a fork of [oneko-swift](https://github.com/oneko-swift/oneko-swift),
+the native Swift/AppKit port of the classic [oneko](https://github.com/adryd325/oneko.js):
 a little cat that chases your mouse cursor around the screen. No Electron, no
-dependencies, no network access, no permission prompts — a ~320 KB app that
-does one thing well.
+dependencies, no network access, no permission prompts.
 
-[![Latest release](https://img.shields.io/github/v/release/oneko-swift/oneko-swift)](https://github.com/oneko-swift/oneko-swift/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Platform: macOS 13+](https://img.shields.io/badge/platform-macOS%2013%2B-black)
+![Platform: macOS 11+](https://img.shields.io/badge/platform-macOS%2011%2B-black)
 
-Requires macOS 13 (Ventura) or later. Universal binary — Apple Silicon and
+Requires macOS 11 (Big Sur) or later. Universal binary — Apple Silicon and
 Intel.
 
 ![oneko chasing the cursor](docs/previews/oneko-live-preview.gif)
 
 ## Install
 
-### Via Homebrew
-
-```sh
-brew install --cask oneko-swift/tap/oneko
-```
-
-Homebrew 6+ asks you to trust third-party taps first: `brew trust oneko-swift/tap`.
-
-### Manually
-
-1. Download `Oneko-<version>.zip` from the
-   [latest release](https://github.com/oneko-swift/oneko-swift/releases/latest).
-2. Unzip it and drag `Oneko.app` into `/Applications`.
+1. Download `MonsieurPierre-<version>.zip` from the
+   [latest release](https://github.com/lolesterrr/oneko-woah/releases/latest),
+   or build it yourself (below).
+2. Unzip it and drag `Monsieur Pierre.app` into `/Applications`.
 3. Authorize the app on first launch (below).
 
-### First launch (both methods)
+### First launch
 
-The app is not notarized (that requires a paid Apple Developer account; this
-is a free open-source project), so Gatekeeper blocks the first launch. The
-entire source is in this repo and `./build.sh` produces the same app in
-seconds if you'd rather not trust a downloaded binary. To authorize it:
+The app is not notarized (that requires a paid Apple Developer account), so
+Gatekeeper blocks the first launch of a downloaded copy. To authorize it:
 
-1. Open `Oneko.app` once — macOS shows a warning and refuses to run it.
-2. Go to System Settings → Privacy & Security, scroll down to the notice
-   about Oneko and click **Open Anyway** (on macOS 14 and older you can
-   instead right-click `Oneko.app` → Open).
+1. Open `Monsieur Pierre.app` once — macOS shows a warning and refuses to run it.
+2. Right-click `Monsieur Pierre.app` → Open (on macOS 15 and later: System
+   Settings → Privacy & Security, then **Open Anyway** next to the notice).
 3. Launch it again and confirm. The cat appears; this is only needed once.
 
 Terminal alternative to step 2, same effect:
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/Oneko.app
+xattr -dr com.apple.quarantine "/Applications/Monsieur Pierre.app"
 ```
 
 Building from source (below) avoids the Gatekeeper step entirely.
 
+The first launch also turns on **Launch at Login**, so the cat comes back
+after every restart. Untick it in the menu to stop that.
+
 ## Raycast extension
 
 [`raycast/`](raycast/) holds a Raycast extension with four commands: Toggle
-Cat, Change Skin (a grid with sprite previews), Set Speed, and Quit Oneko.
+Cat, Change Skin (a grid with sprite previews), Set Speed, and Quit Monsieur Pierre.
 It is a remote control, not a replacement — it drives the installed app
-through the URL scheme below, so install Oneko first (see above). Until the
+through the URL scheme below, so install Monsieur Pierre first (see above). Until the
 extension reaches the Raycast Store, import it locally:
 
 ```sh
@@ -66,7 +56,7 @@ cd raycast && npm install && npx ray develop
 
 ## Scripting (oneko:// URL scheme)
 
-Anything that can open a URL can control Oneko — Raycast Quicklinks, Apple
+Anything that can open a URL can control Monsieur Pierre — Raycast Quicklinks, Apple
 Shortcuts, or `open` in a script. Opening any `oneko://` URL launches the
 app if it isn't running.
 
@@ -84,10 +74,12 @@ cat is `cat`).
 
 ```sh
 ./build.sh
-open build/Oneko.app
+open "build/Monsieur Pierre.app"
 ```
 
-Requires Xcode command line tools. No other dependencies.
+Requires Xcode command line tools. No other dependencies. On Big Sur the
+newest available Xcode is 13.2.1 (Swift 5.5), and the code is kept
+compatible with it.
 
 ## Features
 
@@ -118,8 +110,9 @@ window, no onboarding, no Dock icon. Just the cat.
 - **Multi-monitor done right**: works with mixed Retina/non-Retina setups and
   non-rectangular arrangements — the cat is confined to real screens, never
   parked in the dead space between them.
-- **Launch at Login** (via the system `SMAppService` — shows up in System
-  Settings → Login Items like a good citizen), and **Show/Hide** that reduces
+- **Launch at Login**, on by default (via the system `SMAppService` on
+  macOS 13+, and a per-user LaunchAgent in `~/Library/LaunchAgents` on
+  macOS 11 and 12), and **Show/Hide** that reduces
   the app to literally zero CPU.
 - **Private by construction**: the app never opens a network connection — no
   updater, no telemetry, no downloads (updates come through Homebrew or
@@ -168,7 +161,7 @@ Why it stays that cheap:
 Check it yourself while the app runs:
 
 ```sh
-top -l 3 -pid $(pgrep -x Oneko) -stats cpu,power,mem
+top -l 3 -pid $(pgrep -x MonsieurPierre) -stats cpu,power,mem
 ```
 
 ## Layout
@@ -180,15 +173,16 @@ top -l 3 -pid $(pgrep -x Oneko) -stats cpu,power,mem
 - `Sources/CatWindow.swift` — transparent click-through overlay window
 - `Sources/SpriteSheet.swift` — slices the 256×128 sheets into frames; the
   sprite variant catalog (with menu grouping) lives here
-- `Sources/AppDelegate.swift` — menu bar UI, settings (UserDefaults),
-  launch-at-login via `SMAppService`
+- `Sources/AppDelegate.swift` — menu bar UI, settings (UserDefaults)
+- `Sources/LoginItem.swift` — launch at login: `SMAppService` on macOS 13+,
+  a LaunchAgent on macOS 11 and 12
 - `Resources/*.png` — the 27 sprite sheets, all in the oneko.js 256×128 layout
 - `tools/makesheet.swift` — builds a sheet from the original X11 oneko XBM
   bitmaps + transparency masks, for any animal in the oneko sources
 - `tools/makepreviews.swift` — regenerates the animated README previews in
   `docs/previews/` from `Resources/`
 
-Settings persist in `defaults` domain `app.oneko.Oneko`.
+Settings persist in `defaults` domain `com.lolesterrr.monsieurpierre`.
 
 ## Sprite gallery
 
