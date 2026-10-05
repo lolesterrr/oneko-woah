@@ -104,6 +104,9 @@ final class CatController {
 
     var isRunning: Bool { timer != nil }
 
+    /// The cat's center, in global AppKit coordinates.
+    var position: CGPoint { pos }
+
     /// Interrupt sleep/idle animations, e.g. when settings change.
     private func wake() {
         resetIdleAnimation()
