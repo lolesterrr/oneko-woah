@@ -106,9 +106,16 @@ window, no onboarding, no Dock icon. Just the cat.
   (with the Cat, Ghost, Gray and Monsieur Pierre sheets, which have gaze
   frames). Typing is detected from the system's key-press count only; the
   app never sees which keys you press.
-- **Click-through overlay** — borderless and transparent; the cat never
-  intercepts a click and renders above every app, including full-screen apps,
-  on all Spaces.
+- **Clipboard holder** (lazy cat): it "swallows" whatever you copy, text,
+  images or files, with a little hop, and keeps the last 5 in memory only
+  (nothing is written to disk, and hiding the lazy cat forgets them). Copies
+  that password managers mark as secret or temporary are skipped.
+  Right-click the lazy cat to see what it holds and click one to put it back
+  on the clipboard; drop files on it to keep them for pasting later; left
+  click pets it.
+- **Overlay** — borderless and transparent, above every app, including
+  full-screen apps, on all Spaces. The chaser never intercepts a click; the
+  lazy cat takes clicks and drops only on its own 32×32 square.
 - **Faithful port** of the original state machine: 8-directional running,
   alert, idle, random face-washing and wall-scratching (when idling near a
   screen edge), tired → sleeping after prolonged inactivity.
@@ -193,6 +200,8 @@ top -l 3 -pid $(pgrep -x MonsieurPierre) -stats cpu,power,mem
   and `WanderStrategy` (the lazy cat)
 - `Sources/WindowWatch.swift` — where other apps' windows are (positions
   only), for the lazy cat's window-sitting
+- `Sources/ClipboardHolder.swift` — the lazy cat's last 5 copies and dropped
+  files
 - `Sources/CatWindow.swift` — transparent click-through overlay window
 - `Sources/SpriteSheet.swift` — slices the 256×128 sheets into frames; the
   sprite variant catalog (with menu grouping) lives here
