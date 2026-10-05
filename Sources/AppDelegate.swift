@@ -1,7 +1,20 @@
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// The chaser: the classic cat that follows the cursor.
     private let cat = CatController()
+    /// The lazy cat ignores the cursor, naps a lot and wanders now and then.
+    private let lazyCat: CatController = {
+        let screen = NSScreen.main?.visibleFrame ?? .init(x: 0, y: 0, width: 800, height: 600)
+        let cat = CatController(position: CGPoint(x: screen.minX + screen.width * 0.25,
+                                                  y: screen.minY + SpriteSheet.frameSize))
+        cat.strategy = WanderStrategy()
+        cat.speed = 4
+        cat.idleAnimationOdds = 50
+        // Placeholder look until the lazy cat gets its own sprite sheet.
+        cat.variant = SpriteVariant(rawValue: "black") ?? .cat
+        return cat
+    }()
     private var statusItem: NSStatusItem!
 
     private let defaults = UserDefaults.standard
@@ -15,10 +28,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let displayName = "lockedDisplayName"
         static let displayUUID = "lockedDisplayUUID"
         static let loginItemDefaulted = "loginItemDefaulted"
+        static let lazyHidden = "lazyCatHidden"
     }
 
     // Menu items whose state we refresh.
     private var showHideItem: NSMenuItem!
+    private var lazyShowHideItem: NSMenuItem!
     private var horizontalItem: NSMenuItem!
     private var topItem: NSMenuItem!
     private var bottomItem: NSMenuItem!
@@ -48,6 +63,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
         if !defaults.bool(forKey: Keys.hidden) {
             cat.start()
+        }
+        if !defaults.bool(forKey: Keys.lazyHidden) {
+            lazyCat.start()
         }
         refreshMenuState()
         finishedLaunching = true
@@ -163,8 +181,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         loginItem = menu.addItem(withTitle: "Launch at Login",
                                  action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         menu.addItem(.separator())
-        showHideItem = menu.addItem(withTitle: "Hide Cat",
+        showHideItem = menu.addItem(withTitle: "Hide Chaser",
                             action: #selector(toggleShown), keyEquivalent: "")
+        lazyShowHideItem = menu.addItem(withTitle: "Hide Lazy Cat",
+                                        action: #selector(toggleLazyShown), keyEquivalent: "")
         menu.addItem(withTitle: "Quit Monsieur Pierre", action: #selector(quit), keyEquivalent: "q")
 
         for item in menu.items { item.target = self }
@@ -291,7 +311,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func refreshMenuState() {
-        showHideItem.title = cat.isRunning ? "Hide Cat" : "Show Cat"
+        showHideItem.title = cat.isRunning ? "Hide Chaser" : "Show Chaser"
+        lazyShowHideItem.title = lazyCat.isRunning ? "Hide Lazy Cat" : "Show Lazy Cat"
         let horizontal = defaults.bool(forKey: Keys.horizontal)
         horizontalItem.state = horizontal ? .on : .off
         topItem.state = dockEdge == .top ? .on : .off
@@ -315,6 +336,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleShown() {
         setShown(!cat.isRunning)
+    }
+
+    @objc private func toggleLazyShown() {
+        lazyCat.isRunning ? lazyCat.stop() : lazyCat.start()
+        defaults.set(!lazyCat.isRunning, forKey: Keys.lazyHidden)
+        refreshMenuState()
     }
 
     private func setShown(_ shown: Bool) {
