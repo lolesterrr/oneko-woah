@@ -90,6 +90,12 @@ window, no onboarding, no Dock icon. Just the cat.
   Pierre (a fat black-and-white tuxedo cat), ignores it, naps a lot and
   strolls to a new spot on its screen every few minutes. Show or hide each
   one from the menu.
+- **Personal space**: the chaser slows down as it closes in and stops 50,
+  75 (the default) or 100 points from the cursor, keeping you company
+  instead of sitting on it. "Off (Classic)" restores the original distance.
+- **Startled by fast moves**: swing the mouse violently and the chaser
+  jumps, bolts to the nearest screen edge and peeks out half hidden until
+  the mouse has been calm for about three seconds. On by default.
 - **Click-through overlay** — borderless and transparent; the cat never
   intercepts a click and renders above every app, including full-screen apps,
   on all Spaces.
