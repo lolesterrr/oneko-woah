@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let wander = WanderStrategy()
     private let clipboard = ClipboardHolder()
     private let mail = MailWatch()
+    private let bubble = SpeechBubble()
+    private var jokeTimer: Timer?
     private let lazyCat: CatController = {
         let screen = NSScreen.main?.visibleFrame ?? .init(x: 0, y: 0, width: 800, height: 600)
         let cat = CatController(position: CGPoint(x: screen.minX + screen.width * 0.25,
@@ -34,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let lazyPerches = "lazyCatPerches"
         static let clipboard = "lazyCatHoldsClipboard"
         static let mail = "lazyCatWatchesMail"
+        static let jokes = "lazyCatTellsJokes"
         static let startle = "startle"
         static let reactions = "reactions"
     }
@@ -44,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var perchItem: NSMenuItem!
     private var clipboardItem: NSMenuItem!
     private var mailItem: NSMenuItem!
+    private var jokesItem: NSMenuItem!
     private var horizontalItem: NSMenuItem!
     private var spaceItems: [NSMenuItem] = []
     private var startleItem: NSMenuItem!
@@ -75,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lazyCat.strategy = wander
         setUpClipboard()
         setUpMail()
+        scheduleJoke(first: true)
         enableLaunchAtLoginOnFirstRun()
         reconcileLockedDisplay()
         setUpStatusItem()
@@ -230,6 +235,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                      action: #selector(toggleClipboard), keyEquivalent: "")
         mailItem = menu.addItem(withTitle: "Lazy Cat Watches Your Mail",
                                 action: #selector(toggleMail), keyEquivalent: "")
+        jokesItem = menu.addItem(withTitle: "Lazy Cat Tells Jokes",
+                                 action: #selector(toggleJokes), keyEquivalent: "")
         menu.addItem(withTitle: "Quit Monsieur Pierre", action: #selector(quit), keyEquivalent: "q")
 
         for item in menu.items { item.target = self }
@@ -340,6 +347,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         defaults.bool(forKey: Keys.mail)
     }
 
+    private var tellsJokes: Bool {
+        defaults.object(forKey: Keys.jokes) as? Bool ?? true
+    }
+
     private var reactions: Bool {
         defaults.object(forKey: Keys.reactions) as? Bool ?? true
     }
@@ -396,6 +407,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         perchItem.state = lazyPerches ? .on : .off
         clipboardItem.state = holdsClipboard ? .on : .off
         mailItem.state = watchesMail ? .on : .off
+        jokesItem.state = tellsJokes ? .on : .off
         let horizontal = defaults.bool(forKey: Keys.horizontal)
         horizontalItem.state = horizontal ? .on : .off
         topItem.state = dockEdge == .top ? .on : .off
@@ -520,7 +532,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.clipboard.add(files: urls)
                 self.lazyCat.bounce()
             },
-            onClick: { [weak self] in self?.lazyCat.bounce() })
+            onClick: { [weak self] in
+                guard let self = self else { return }
+                if self.bubble.isShowing {
+                    self.bubble.dismiss()
+                } else {
+                    self.lazyCat.bounce()
+                }
+            })
     }
 
     /// Only while the lazy cat is out: hiding it stops the clipboard and
@@ -528,6 +547,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateLazyCatFeatures() {
         clipboard.isEnabled = holdsClipboard && lazyCat.isRunning
         mail.isEnabled = watchesMail && lazyCat.isRunning
+        if !lazyCat.isRunning || !tellsJokes { bubble.dismiss() }
     }
 
     /// Right-click on the lazy cat: unread mail first (when watching), then
@@ -539,6 +559,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(.separator())
         }
         addClipboardItems(to: menu)
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Tell Me a Joke", action: #selector(tellJoke),
+                     keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Add Your Own Jokes…", action: #selector(editJokes),
+                     keyEquivalent: "").target = self
         return menu
     }
 
@@ -593,6 +618,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                     self.lazyCat.bounce()
                 }
+            }
+            if let newest = self.mail.unread.first {
+                self.say("You've got mail!\n\(newest.title)")
             }
         }
         mail.onChange = { [weak self] in self?.showUnreadCount() }
@@ -650,6 +678,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func checkMail() {
         mail.check()
+    }
+
+    @objc private func toggleJokes() {
+        defaults.set(!tellsJokes, forKey: Keys.jokes)
+        applySettings()
+        refreshMenuState()
+    }
+
+    // MARK: - Jokes
+
+    private func say(_ text: String) {
+        guard lazyCat.isRunning else { return }
+        bubble.say(text) { [weak self] in self?.lazyCat.position ?? .zero }
+    }
+
+    /// Now and then, the lazy cat wakes up long enough for a joke: the first
+    /// a few minutes after launch, then every 20 to 45 minutes.
+    private func scheduleJoke(first: Bool = false) {
+        jokeTimer?.invalidate()
+        let delay = first ? Double.random(in: 120...300) : Double.random(in: 1200...2700)
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            if self.tellsJokes && !self.bubble.isShowing {
+                self.tellJoke()
+            }
+            self.scheduleJoke()
+        }
+        timer.tolerance = 30
+        RunLoop.main.add(timer, forMode: .common)
+        jokeTimer = timer
+    }
+
+    @objc private func tellJoke() {
+        lazyCat.bounce()
+        say(Jokes.next())
+    }
+
+    /// Opens jokes.txt in the default text editor, creating it with a short
+    /// how-to the first time.
+    @objc private func editJokes() {
+        let url = Jokes.userFile
+        if !FileManager.default.fileExists(atPath: url.path) {
+            let template = """
+                # Monsieur Pierre's extra jokes: one per line. Write \\n to start
+                # a new line in the speech bubble. Lines starting with # are skipped.
+                Why did Monsieur Pierre sit on the laptop?\\nIt was warm. That's the whole joke.
+
+                """
+            do {
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try template.write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                return NSLog("Couldn't create jokes file: \(error)")
+            }
+        }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func togglePerches() {

@@ -120,6 +120,13 @@ window, no onboarding, no Dock icon. Just the cat.
   right-clicking the cat lists the newest unread messages (click one to
   open it in Mail). Read-only: it never marks, moves or sends anything.
   macOS asks once for permission to control Mail.
+- **Jokes** (lazy cat, on by default): every 20 to 45 minutes he wakes up
+  long enough to tell a cat joke or a dad joke in a little speech bubble.
+  About 100 are built in and work offline; right-click him for "Tell Me a
+  Joke", or "Add Your Own Jokes…" to edit
+  `~/Library/Application Support/Monsieur Pierre/jokes.txt` (one per line).
+  New mail gets a "You've got mail!" bubble too. Click him to dismiss a
+  bubble.
 - **Overlay** — borderless and transparent, above every app, including
   full-screen apps, on all Spaces. The chaser never intercepts a click; the
   lazy cat takes clicks and drops only on its own 32×32 square.
@@ -210,6 +217,8 @@ top -l 3 -pid $(pgrep -x MonsieurPierre) -stats cpu,power,mem
 - `Sources/ClipboardHolder.swift` — the lazy cat's last 5 copies and dropped
   files
 - `Sources/MailWatch.swift` — unread mail from Apple Mail, over Apple Events
+- `Sources/Jokes.swift` — the lazy cat's built-in jokes, plus your own
+- `Sources/SpeechBubble.swift` — the speech bubble that follows the lazy cat
 - `Sources/CatWindow.swift` — transparent click-through overlay window
 - `Sources/SpriteSheet.swift` — slices the 256×128 sheets into frames; the
   sprite variant catalog (with menu grouping) lives here
