@@ -88,8 +88,12 @@ window, no onboarding, no Dock icon. Just the cat.
 
 - **Two cats**: the chaser follows your cursor; the lazy cat, Monsieur
   Pierre (a fat black-and-white tuxedo cat), ignores it, naps a lot and
-  strolls to a new spot on its screen every few minutes. Show or hide each
-  one from the menu.
+  strolls to a new spot on its screen every few minutes. About half the
+  time it climbs onto the active window's title bar instead and rides along
+  when you drag the window; it follows when you switch apps and hops off
+  when the window closes. Only window positions are read, never titles or
+  contents. Show or hide each cat, and turn window-sitting off, from the
+  menu.
 - **Personal space**: the chaser slows down as it closes in and stops 50,
   75 (the default) or 100 points from the cursor, keeping you company
   instead of sitting on it. "Off (Classic)" restores the original distance.
@@ -187,6 +191,8 @@ top -l 3 -pid $(pgrep -x MonsieurPierre) -stats cpu,power,mem
 - `Sources/TargetStrategy.swift` — the single swappable target-position piece:
   `FullChaseStrategy` (classic 2D), `HorizontalPinnedStrategy` (pinned row)
   and `WanderStrategy` (the lazy cat)
+- `Sources/WindowWatch.swift` — where other apps' windows are (positions
+  only), for the lazy cat's window-sitting
 - `Sources/CatWindow.swift` — transparent click-through overlay window
 - `Sources/SpriteSheet.swift` — slices the 256×128 sheets into frames; the
   sprite variant catalog (with menu grouping) lives here
