@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let cat = CatController()
     /// The lazy cat ignores the cursor, naps a lot and wanders now and then.
     private let wander = WanderStrategy()
+    private let clipboard = ClipboardHolder()
     private let lazyCat: CatController = {
         let screen = NSScreen.main?.visibleFrame ?? .init(x: 0, y: 0, width: 800, height: 600)
         let cat = CatController(position: CGPoint(x: screen.minX + screen.width * 0.25,
@@ -30,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let lazyHidden = "lazyCatHidden"
         static let personalSpace = "personalSpace"
         static let lazyPerches = "lazyCatPerches"
+        static let clipboard = "lazyCatHoldsClipboard"
         static let startle = "startle"
         static let reactions = "reactions"
     }
@@ -38,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var showHideItem: NSMenuItem!
     private var lazyShowHideItem: NSMenuItem!
     private var perchItem: NSMenuItem!
+    private var clipboardItem: NSMenuItem!
     private var horizontalItem: NSMenuItem!
     private var spaceItems: [NSMenuItem] = []
     private var startleItem: NSMenuItem!
@@ -67,6 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         lazyCat.strategy = wander
+        setUpClipboard()
         enableLaunchAtLoginOnFirstRun()
         reconcileLockedDisplay()
         setUpStatusItem()
@@ -81,6 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !defaults.bool(forKey: Keys.lazyHidden) {
             lazyCat.start()
         }
+        updateClipboard()
         refreshMenuState()
         finishedLaunching = true
         pendingURLs.forEach(handle)
@@ -215,6 +220,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                         action: #selector(toggleLazyShown), keyEquivalent: "")
         perchItem = menu.addItem(withTitle: "Lazy Cat Sits on Windows",
                                  action: #selector(togglePerches), keyEquivalent: "")
+        clipboardItem = menu.addItem(withTitle: "Lazy Cat Holds Your Clipboard",
+                                     action: #selector(toggleClipboard), keyEquivalent: "")
         menu.addItem(withTitle: "Quit Monsieur Pierre", action: #selector(quit), keyEquivalent: "q")
 
         for item in menu.items { item.target = self }
@@ -315,6 +322,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         defaults.object(forKey: Keys.lazyPerches) as? Bool ?? true
     }
 
+    private var holdsClipboard: Bool {
+        defaults.object(forKey: Keys.clipboard) as? Bool ?? true
+    }
+
     private var reactions: Bool {
         defaults.object(forKey: Keys.reactions) as? Bool ?? true
     }
@@ -354,6 +365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cat.startles = startles
         cat.reacts = reactions
         wander.perches = lazyPerches
+        updateClipboard()
         cat.variant = spriteVariant
         var strategy: TargetStrategy = defaults.bool(forKey: Keys.horizontal)
             ? HorizontalPinnedStrategy(edge: dockEdge)
@@ -368,6 +380,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showHideItem.title = cat.isRunning ? "Hide Chaser" : "Show Chaser"
         lazyShowHideItem.title = lazyCat.isRunning ? "Hide Lazy Cat" : "Show Lazy Cat"
         perchItem.state = lazyPerches ? .on : .off
+        clipboardItem.state = holdsClipboard ? .on : .off
         let horizontal = defaults.bool(forKey: Keys.horizontal)
         horizontalItem.state = horizontal ? .on : .off
         topItem.state = dockEdge == .top ? .on : .off
@@ -414,6 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleLazyShown() {
         lazyCat.isRunning ? lazyCat.stop() : lazyCat.start()
         defaults.set(!lazyCat.isRunning, forKey: Keys.lazyHidden)
+        updateClipboard()
         refreshMenuState()
     }
 
@@ -470,6 +484,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         defaults.set(Double(value), forKey: Keys.personalSpace)
         applySettings()
         refreshMenuState()
+    }
+
+    @objc private func toggleClipboard() {
+        defaults.set(!holdsClipboard, forKey: Keys.clipboard)
+        applySettings()
+        refreshMenuState()
+    }
+
+    // MARK: - Clipboard holder
+
+    /// The lazy cat swallows copies (and files dropped on it) with a little
+    /// hop; right-click shows what it holds, left click pets it.
+    private func setUpClipboard() {
+        clipboard.onSwallow = { [weak self] in self?.lazyCat.bounce() }
+        lazyCat.makeInteractive(
+            menu: { [weak self] in self?.clipboardMenu() },
+            onDrop: { [weak self] urls in
+                guard let self = self, self.holdsClipboard else { return }
+                self.clipboard.add(files: urls)
+                self.lazyCat.bounce()
+            },
+            onClick: { [weak self] in self?.lazyCat.bounce() })
+    }
+
+    /// Only while the lazy cat is out: hiding it stops the clipboard watch
+    /// and forgets what it held.
+    private func updateClipboard() {
+        clipboard.isEnabled = holdsClipboard && lazyCat.isRunning
+    }
+
+    private func clipboardMenu() -> NSMenu {
+        let menu = NSMenu()
+        guard holdsClipboard else {
+            menu.addItem(withTitle: "Clipboard holding is off", action: nil, keyEquivalent: "")
+            return menu
+        }
+        let items = clipboard.items
+        menu.addItem(withTitle: items.isEmpty ? "Nothing swallowed yet"
+                                              : "Monsieur Pierre is holding:",
+                     action: nil, keyEquivalent: "")
+        for (index, clip) in items.enumerated() {
+            let item = menu.addItem(withTitle: clip.title,
+                                    action: #selector(restoreClip(_:)), keyEquivalent: "")
+            item.tag = index
+            item.image = clip.thumbnail
+            item.target = self
+            item.toolTip = "Put back on the clipboard"
+        }
+        if !items.isEmpty {
+            menu.addItem(.separator())
+            menu.addItem(withTitle: "Forget All", action: #selector(forgetClips),
+                         keyEquivalent: "").target = self
+        }
+        return menu
+    }
+
+    @objc private func restoreClip(_ sender: NSMenuItem) {
+        clipboard.restore(at: sender.tag)
+    }
+
+    @objc private func forgetClips() {
+        clipboard.clear()
     }
 
     @objc private func togglePerches() {

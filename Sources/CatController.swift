@@ -197,6 +197,20 @@ final class CatController {
 
     // MARK: - Reactions
 
+    /// Lets this cat take clicks and file drops (see CatWindow).
+    func makeInteractive(menu: @escaping () -> NSMenu?,
+                         onDrop: @escaping ([URL]) -> Void,
+                         onClick: @escaping () -> Void) {
+        window.makeInteractive(menu: menu, onDrop: onDrop, onClick: onClick)
+    }
+
+    /// A little hop, whatever the reaction settings: being petted, or
+    /// swallowing something.
+    func bounce() {
+        guard isRunning else { return }
+        hopTicks = 3
+    }
+
     /// A click anywhere: a small pounce in place.
     func noteClick() {
         guard reacts, isRunning else { return }
@@ -232,7 +246,7 @@ final class CatController {
             bobHeight = min(4, 1 + scrolled / 15)
         }
 
-        if typingFuriously {
+        if reacts, typingFuriously {
             // Paws over the ears; it stays dazed for a moment afterwards.
             setSprite("scratchSelf", frameCount)
             dazedTicks = 15
@@ -343,7 +357,7 @@ final class CatController {
 
     private func idle() {
         idleTime += 1
-        if reacts, idleAnimation == nil, react() { return }
+        if idleAnimation == nil, react() { return }
 
         // Rarely start a one-off idle animation (sleep, wash, or scratch a
         // nearby screen edge) — same odds as oneko.js.
