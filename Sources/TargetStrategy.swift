@@ -9,6 +9,9 @@ protocol TargetStrategy {
     /// Strategies that don't care where the cat is only implement the
     /// single-argument version.
     func target(forMouse mouse: CGPoint, cat: CGPoint) -> CGPoint
+    /// Movement to apply to the cat without walking, e.g. riding along on a
+    /// window that's being dragged. Asked once per tick, after `target`.
+    func takeDrift() -> CGVector
     /// Whether the cat is close enough to its target to stop and idle.
     /// `dx`/`dy` are target minus cat position; `threshold` is the classic
     /// oneko stop distance.
@@ -19,6 +22,8 @@ extension TargetStrategy {
     func target(forMouse mouse: CGPoint, cat: CGPoint) -> CGPoint {
         target(forMouse: mouse)
     }
+
+    func takeDrift() -> CGVector { .zero }
 
     func isSettled(dx: CGFloat, dy: CGFloat, threshold: CGFloat) -> Bool {
         (dx * dx + dy * dy).squareRoot() < threshold
@@ -92,13 +97,30 @@ struct HorizontalPinnedStrategy: TargetStrategy {
 }
 
 /// The lazy cat: ignores the cursor. It sits where it is and, every few
-/// minutes, picks a random spot on the screen it's on and strolls there.
+/// minutes, strolls somewhere new: half the time a random spot on its
+/// screen, otherwise the top of the frontmost app's window, where it sits
+/// and rides along when the window is dragged. When the app in front
+/// changes it moves over to the new front window; when its window closes,
+/// minimizes or goes full screen it hops back down.
 final class WanderStrategy: TargetStrategy {
+    /// Whether the cat may sit on windows.
+    var perches = true {
+        didSet { if !perches { perch = nil } }
+    }
     /// Seconds between strolls.
     private let interval: ClosedRange<TimeInterval> = 90...300
     private var spot: CGPoint?
     /// The first stroll comes sooner, so the cat shows it can move.
     private var nextStroll = Date().addingTimeInterval(.random(in: 20...60))
+
+    private struct Perch {
+        let window: CGWindowID
+        let pid: pid_t
+        /// Where along the window's top edge the cat sits.
+        let offsetX: CGFloat
+    }
+    private var perch: Perch?
+    private var drift = CGVector.zero
 
     /// Unused: the controller always asks with the cat's position.
     func target(forMouse mouse: CGPoint) -> CGPoint { spot ?? mouse }
@@ -106,12 +128,57 @@ final class WanderStrategy: TargetStrategy {
     func target(forMouse mouse: CGPoint, cat: CGPoint) -> CGPoint {
         let now = Date()
         if now >= nextStroll {
-            spot = Self.randomSpot(near: cat)
             nextStroll = now.addingTimeInterval(.random(in: interval))
+            perch = nil
+            if perches, Bool.random() { perchOnFrontWindow() }
+            if perch == nil { spot = Self.randomSpot(near: cat) }
+        }
+        if let current = perch {
+            followPerch(current, cat: cat)
         }
         if let spot = spot { return spot }
         spot = cat
         return cat
+    }
+
+    func takeDrift() -> CGVector {
+        defer { drift = .zero }
+        return drift
+    }
+
+    private func perchOnFrontWindow() {
+        guard let front = WindowWatch.frontWindow() else { return }
+        let margin = SpriteSheet.frameSize
+        perch = Perch(window: front.id, pid: front.pid,
+                      offsetX: .random(in: margin...(front.frame.width - margin)))
+        spot = Self.spot(on: front.frame, offsetX: perch!.offsetX)
+    }
+
+    private func followPerch(_ current: Perch, cat: CGPoint) {
+        // Another app came to the front: go and sit on its window instead.
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier != current.pid {
+            perch = nil
+            perchOnFrontWindow()
+            if perch == nil { spot = Self.randomSpot(near: cat) }
+            return
+        }
+        guard let frame = WindowWatch.frame(of: current.window) else {
+            // The window went away: hop back down.
+            perch = nil
+            spot = Self.randomSpot(near: cat)
+            return
+        }
+        let newSpot = Self.spot(on: frame, offsetX: min(current.offsetX, frame.width - 8))
+        // Sitting on the window (not still walking to it): ride along.
+        if let old = spot, hypot(cat.x - old.x, cat.y - old.y) < 48 {
+            drift = CGVector(dx: newSpot.x - old.x, dy: newSpot.y - old.y)
+        }
+        spot = newSpot
+    }
+
+    /// The cat's center when sitting on top of `frame`, feet on the edge.
+    private static func spot(on frame: CGRect, offsetX: CGFloat) -> CGPoint {
+        CGPoint(x: frame.minX + offsetX, y: frame.maxY + SpriteSheet.frameSize / 2)
     }
 
     /// Somewhere on the cat's current screen, clear of the menu bar and Dock.

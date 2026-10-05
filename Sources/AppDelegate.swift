@@ -4,11 +4,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The chaser: the classic cat that follows the cursor.
     private let cat = CatController()
     /// The lazy cat ignores the cursor, naps a lot and wanders now and then.
+    private let wander = WanderStrategy()
     private let lazyCat: CatController = {
         let screen = NSScreen.main?.visibleFrame ?? .init(x: 0, y: 0, width: 800, height: 600)
         let cat = CatController(position: CGPoint(x: screen.minX + screen.width * 0.25,
                                                   y: screen.minY + SpriteSheet.frameSize))
-        cat.strategy = WanderStrategy()
         cat.speed = 4
         cat.idleAnimationOdds = 50
         cat.variant = .pierre
@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let loginItemDefaulted = "loginItemDefaulted"
         static let lazyHidden = "lazyCatHidden"
         static let personalSpace = "personalSpace"
+        static let lazyPerches = "lazyCatPerches"
         static let startle = "startle"
         static let reactions = "reactions"
     }
@@ -36,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Menu items whose state we refresh.
     private var showHideItem: NSMenuItem!
     private var lazyShowHideItem: NSMenuItem!
+    private var perchItem: NSMenuItem!
     private var horizontalItem: NSMenuItem!
     private var spaceItems: [NSMenuItem] = []
     private var startleItem: NSMenuItem!
@@ -64,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        lazyCat.strategy = wander
         enableLaunchAtLoginOnFirstRun()
         reconcileLockedDisplay()
         setUpStatusItem()
@@ -210,6 +213,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             action: #selector(toggleShown), keyEquivalent: "")
         lazyShowHideItem = menu.addItem(withTitle: "Hide Lazy Cat",
                                         action: #selector(toggleLazyShown), keyEquivalent: "")
+        perchItem = menu.addItem(withTitle: "Lazy Cat Sits on Windows",
+                                 action: #selector(togglePerches), keyEquivalent: "")
         menu.addItem(withTitle: "Quit Monsieur Pierre", action: #selector(quit), keyEquivalent: "q")
 
         for item in menu.items { item.target = self }
@@ -306,6 +311,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         defaults.object(forKey: Keys.startle) as? Bool ?? true
     }
 
+    private var lazyPerches: Bool {
+        defaults.object(forKey: Keys.lazyPerches) as? Bool ?? true
+    }
+
     private var reactions: Bool {
         defaults.object(forKey: Keys.reactions) as? Bool ?? true
     }
@@ -344,6 +353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cat.personalSpace = CGFloat(personalSpace)
         cat.startles = startles
         cat.reacts = reactions
+        wander.perches = lazyPerches
         cat.variant = spriteVariant
         var strategy: TargetStrategy = defaults.bool(forKey: Keys.horizontal)
             ? HorizontalPinnedStrategy(edge: dockEdge)
@@ -357,6 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func refreshMenuState() {
         showHideItem.title = cat.isRunning ? "Hide Chaser" : "Show Chaser"
         lazyShowHideItem.title = lazyCat.isRunning ? "Hide Lazy Cat" : "Show Lazy Cat"
+        perchItem.state = lazyPerches ? .on : .off
         let horizontal = defaults.bool(forKey: Keys.horizontal)
         horizontalItem.state = horizontal ? .on : .off
         topItem.state = dockEdge == .top ? .on : .off
@@ -457,6 +468,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func setPersonalSpace(_ sender: NSMenuItem) {
         guard let value = sender.representedObject as? CGFloat else { return }
         defaults.set(Double(value), forKey: Keys.personalSpace)
+        applySettings()
+        refreshMenuState()
+    }
+
+    @objc private func togglePerches() {
+        defaults.set(!lazyPerches, forKey: Keys.lazyPerches)
         applySettings()
         refreshMenuState()
     }

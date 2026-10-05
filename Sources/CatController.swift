@@ -131,6 +131,12 @@ final class CatController {
         if startles, handleFright(travel: travel) { return }
 
         let target = strategy.target(forMouse: mouse, cat: pos)
+        let drift = strategy.takeDrift()
+        if drift != .zero {
+            pos.x += drift.dx
+            pos.y += drift.dy
+            window.move(center: pos)
+        }
         let dx = target.x - pos.x
         let dy = target.y - pos.y
         let distance = (dx * dx + dy * dy).squareRoot()
