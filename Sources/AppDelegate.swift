@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let lazyHidden = "lazyCatHidden"
         static let personalSpace = "personalSpace"
         static let startle = "startle"
+        static let reactions = "reactions"
     }
 
     // Menu items whose state we refresh.
@@ -38,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var horizontalItem: NSMenuItem!
     private var spaceItems: [NSMenuItem] = []
     private var startleItem: NSMenuItem!
+    private var reactionsItem: NSMenuItem!
     private var topItem: NSMenuItem!
     private var bottomItem: NSMenuItem!
     private var speedItems: [NSMenuItem] = []
@@ -69,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             self, selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        watchClicksAndScrolls()
         if !defaults.bool(forKey: Keys.hidden) {
             cat.start()
         }
@@ -181,6 +184,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         spaceItem.submenu = spaceMenu
         startleItem = menu.addItem(withTitle: "Startled by Fast Moves",
                                    action: #selector(toggleStartle), keyEquivalent: "")
+        reactionsItem = menu.addItem(withTitle: "Reacts to Clicks, Scrolling & Typing",
+                                     action: #selector(toggleReactions), keyEquivalent: "")
 
         horizontalItem = menu.addItem(withTitle: "Horizontal-Only Mode",
                                       action: #selector(toggleHorizontal), keyEquivalent: "")
@@ -301,6 +306,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         defaults.object(forKey: Keys.startle) as? Bool ?? true
     }
 
+    private var reactions: Bool {
+        defaults.object(forKey: Keys.reactions) as? Bool ?? true
+    }
+
     /// UInt32(exactly:) guards against out-of-range values from a corrupted
     /// plist or a manual `defaults write`; invalid means unlocked.
     private var lockedDisplayID: CGDirectDisplayID? {
@@ -334,6 +343,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cat.speed = CGFloat(speed)
         cat.personalSpace = CGFloat(personalSpace)
         cat.startles = startles
+        cat.reacts = reactions
         cat.variant = spriteVariant
         var strategy: TargetStrategy = defaults.bool(forKey: Keys.horizontal)
             ? HorizontalPinnedStrategy(edge: dockEdge)
@@ -361,6 +371,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ? .on : .off
         }
         startleItem.state = startles ? .on : .off
+        reactionsItem.state = reactions ? .on : .off
         for item in variantItems {
             item.state = (item.representedObject as? String) == spriteVariant.rawValue ? .on : .off
         }
@@ -369,6 +380,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ? .on : .off
         }
         loginItem.state = LoginItem.isEnabled ? .on : .off
+    }
+
+    /// Clicks and scrolls anywhere feed the chaser's reactions. Mouse events
+    /// can be watched without any permission (key events can't, so typing
+    /// is only counted, in CatController).
+    private func watchClicksAndScrolls() {
+        NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) {
+            [weak self] _ in self?.cat.noteClick()
+        }
+        NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            self?.cat.noteScroll(event.scrollingDeltaY)
+        }
     }
 
     // MARK: - Actions
@@ -434,6 +457,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func setPersonalSpace(_ sender: NSMenuItem) {
         guard let value = sender.representedObject as? CGFloat else { return }
         defaults.set(Double(value), forKey: Keys.personalSpace)
+        applySettings()
+        refreshMenuState()
+    }
+
+    @objc private func toggleReactions() {
+        defaults.set(!reactions, forKey: Keys.reactions)
         applySettings()
         refreshMenuState()
     }

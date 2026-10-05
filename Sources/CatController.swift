@@ -30,6 +30,23 @@ final class CatController {
         didSet { if !startles { fright = .none } }
     }
 
+    /// React to clicks (a hop), scrolling (head bobbing), fast typing
+    /// (covering its ears, then dazed) and watch the cursor while sitting.
+    var reacts = false {
+        didSet { if !reacts { endReactions() } }
+    }
+
+    // Reaction state. Clicks and scrolls are reported by AppDelegate's event
+    // monitors; key presses are counted, never read.
+    private var hopTicks = 0
+    private var pendingScroll: CGFloat = 0
+    private var bobTicks = 0
+    private var bobHeight: CGFloat = 0
+    private var dazedTicks = 0
+    private var lastKeyCount: UInt32?
+    private var recentKeys: [Int] = []
+    private static let furiousKeys = 8                 // key presses per second
+
     /// Mouse travel over the last few ticks, for spotting violent swings.
     private var lastMouse: CGPoint?
     private var recentTravel: [CGFloat] = []
@@ -62,6 +79,8 @@ final class CatController {
         // Mouse travel from before a hide would read as one huge swing.
         lastMouse = nil
         recentTravel.removeAll()
+        lastKeyCount = nil
+        recentKeys.removeAll()
         // Keep the timer steady while the cat is visible; ended in stop() so
         // the process can App Nap whenever the cat is hidden.
         activity = ProcessInfo.processInfo.beginActivity(
@@ -107,6 +126,7 @@ final class CatController {
         recentTravel.append(travel)
         if recentTravel.count > 3 { recentTravel.removeFirst() }
         frameCount += 1
+        if reacts { countKeys() }
 
         if startles, handleFright(travel: travel) { return }
 
@@ -124,6 +144,7 @@ final class CatController {
             return
         }
         resetIdleAnimation()
+        endReactions()
 
         if idleTime > 1 {
             setSprite("alert", 0)
@@ -152,15 +173,112 @@ final class CatController {
     /// One running step of `step` points along (dx, dy), with the matching
     /// direction sprite.
     private func run(dx: CGFloat, dy: CGFloat, distance: CGFloat, step: CGFloat) {
-        // AppKit is y-up, so dy > 0 means the target is above the cat → run N.
+        setSprite(Self.direction(dx: dx, dy: dy, distance: distance), frameCount)
+        pos.x += dx / distance * step
+        pos.y += dy / distance * step
+    }
+
+    /// One of N, NE, E, SE, S, SW, W, NW. AppKit is y-up, so dy > 0 means
+    /// the point is above the cat.
+    private static func direction(dx: CGFloat, dy: CGFloat, distance: CGFloat) -> String {
         var direction = ""
         if dy / distance > 0.5 { direction += "N" }
         if dy / distance < -0.5 { direction += "S" }
         if dx / distance < -0.5 { direction += "W" }
         if dx / distance > 0.5 { direction += "E" }
-        setSprite(direction, frameCount)
-        pos.x += dx / distance * step
-        pos.y += dy / distance * step
+        return direction
+    }
+
+    // MARK: - Reactions
+
+    /// A click anywhere: a small pounce in place.
+    func noteClick() {
+        guard reacts, isRunning else { return }
+        hopTicks = 3
+    }
+
+    /// A scroll anywhere: the head bobs along with it.
+    func noteScroll(_ delta: CGFloat) {
+        guard reacts, isRunning else { return }
+        pendingScroll += abs(delta)
+    }
+
+    /// Key presses per tick, from the system-wide counter. Only the count is
+    /// read, never which keys.
+    private func countKeys() {
+        let count = CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
+        if let last = lastKeyCount { recentKeys.append(Int(count &- last)) }
+        lastKeyCount = count
+        if recentKeys.count > 10 { recentKeys.removeFirst() }
+    }
+
+    private var typingFuriously: Bool {
+        recentKeys.count == 10 && recentKeys.reduce(0, +) >= Self.furiousKeys
+    }
+
+    /// Runs while the cat sits awake. Returns true when a reaction drew
+    /// this tick.
+    private func react() -> Bool {
+        let scrolled = pendingScroll
+        pendingScroll = 0
+        if scrolled > 0 {
+            bobTicks = 4
+            bobHeight = min(4, 1 + scrolled / 15)
+        }
+
+        if typingFuriously {
+            // Paws over the ears; it stays dazed for a moment afterwards.
+            setSprite("scratchSelf", frameCount)
+            dazedTicks = 15
+            return true
+        }
+        if dazedTicks > 0 {
+            dazedTicks -= 1
+            setSprite("tired", 0)
+            return true
+        }
+        if hopTicks > 0 {
+            hopTicks -= 1
+            setSprite("alert", 0)
+            let heights: [CGFloat] = [0, 3, 6]
+            window.move(center: CGPoint(x: pos.x, y: pos.y + heights[hopTicks]))
+            return true
+        }
+        if bobTicks > 0 {
+            bobTicks -= 1
+            let up = bobTicks % 2 == 1
+            let sheet = SpriteSheet.sheet(for: variant)
+            if sheet.hasGaze {
+                setSprite(up ? "gazeN" : "gazeS", 0)
+            } else {
+                setSprite("alert", 0)
+            }
+            window.move(center: CGPoint(x: pos.x, y: pos.y + (up ? bobHeight : 0)))
+            return true
+        }
+        return false
+    }
+
+    private func endReactions() {
+        guard hopTicks > 0 || bobTicks > 0 || dazedTicks > 0 else { return }
+        hopTicks = 0
+        bobTicks = 0
+        dazedTicks = 0
+        window.move(center: pos)
+    }
+
+    /// The sitting frame: looking toward the cursor when the sheet has gaze
+    /// frames and reactions are on, otherwise the classic idle pose.
+    private func sittingSprite() {
+        let mouse = NSEvent.mouseLocation
+        let dx = mouse.x - pos.x
+        let dy = mouse.y - pos.y
+        let distance = (dx * dx + dy * dy).squareRoot()
+        if reacts, distance > SpriteSheet.frameSize, SpriteSheet.sheet(for: variant).hasGaze {
+            setSprite("gaze" + Self.direction(dx: dx, dy: dy, distance: distance), 0)
+        } else {
+            setSprite("idle", 0)
+        }
     }
 
     /// Startle: a violent swing makes the cat jump, run to the nearest screen
@@ -219,6 +337,7 @@ final class CatController {
 
     private func idle() {
         idleTime += 1
+        if reacts, idleAnimation == nil, react() { return }
 
         // Rarely start a one-off idle animation (sleep, wash, or scratch a
         // nearby screen edge) — same odds as oneko.js.
@@ -244,7 +363,7 @@ final class CatController {
             setSprite(idleAnimation!, idleAnimationFrame)
             if idleAnimationFrame > 9 { resetIdleAnimation() }
         default:
-            setSprite("idle", 0)
+            sittingSprite()
             return
         }
         idleAnimationFrame += 1

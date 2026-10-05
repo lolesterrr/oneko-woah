@@ -96,6 +96,12 @@ window, no onboarding, no Dock icon. Just the cat.
 - **Startled by fast moves**: swing the mouse violently and the chaser
   jumps, bolts to the nearest screen edge and peeks out half hidden until
   the mouse has been calm for about three seconds. On by default.
+- **Reactions** (chaser, on by default): a click anywhere makes it pounce
+  in place, scrolling makes its head bob, and typing fast makes it cover
+  its ears and look dazed for a moment. While sitting it watches the cursor
+  (with the Cat, Ghost, Gray and Monsieur Pierre sheets, which have gaze
+  frames). Typing is detected from the system's key-press count only; the
+  app never sees which keys you press.
 - **Click-through overlay** — borderless and transparent; the cat never
   intercepts a click and renders above every app, including full-screen apps,
   on all Spaces.
@@ -190,6 +196,8 @@ top -l 3 -pid $(pgrep -x MonsieurPierre) -stats cpu,power,mem
 - `Resources/*.png` — the 27 sprite sheets, all in the oneko.js 256×128 layout
 - `tools/makepierre.py` — draws the lazy cat's sheets (`pierre.png`,
   `pierre-cow.png`) from code; needs Python 3 with Pillow
+- `tools/makegaze.py` — makes `<sheet>-gaze.png` (eyes looking in 8
+  directions) for sheets whose eyes it can find; needs Pillow
 - `tools/makesheet.swift` — builds a sheet from the original X11 oneko XBM
   bitmaps + transparency masks, for any animal in the oneko sources
 - `tools/makepreviews.swift` — regenerates the animated README previews in

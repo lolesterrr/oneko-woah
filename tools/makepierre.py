@@ -4,8 +4,9 @@ laid out in the oneko.js 256x128 sheet so the app can use it unchanged.
 Usage (needs Pillow):
     python3 tools/makepierre.py Resources/pierre.png tuxedo
     python3 tools/makepierre.py Resources/pierre-cow.png cow
-Also writes <name>-light.png and <name>-dark.png previews at 4x; delete them
-or point the output somewhere else if you only want the sheet."""
+Also writes <name>-gaze.png (the sitting cat looking N, NE, E, SE, S, SW, W,
+NW, for the chaser's gaze) and <name>-light.png / <name>-dark.png previews
+at 4x; delete the previews or write somewhere else if you only want sheets."""
 import sys, math
 from PIL import Image
 
@@ -81,7 +82,7 @@ def patch(f, cx, cy, rx, ry):
     if STYLE == "cow":
         f.paint(ell(cx, cy, rx, ry), "k")
 
-def head_front(f, cx=16, cy=13, eyes="open", ears=1.0):
+def head_front(f, cx=16, cy=13, eyes="open", ears=1.0, look=None):
     e = 6 * ears
     f.add(tri((cx-7, cy-1), (cx-6, cy-e-1), (cx-2, cy-4)), "k")
     f.add(tri((cx+7, cy-1), (cx+6, cy-e-1), (cx+2, cy-4)), "k")
@@ -91,7 +92,14 @@ def head_front(f, cx=16, cy=13, eyes="open", ears=1.0):
     f.paint(ell(cx, cy+3, 4.6, 3.2), "w")          # muzzle
     f.paint(tri((cx-1, cy+1), (cx+1, cy+1), (cx, cy-5)), "w")  # blaze
     ex = (cx-4, cx+3)
-    if eyes == "open":
+    if look is not None:
+        # Pupils toward (gx, gy): image coordinates, so gy < 0 looks up.
+        gx, gy = look
+        for x in ex:
+            f.px([(x, cy-1), (x+1, cy-1), (x, cy), (x+1, cy)], "e")
+            px_ = x + (1 if gx > 0 else 0 if gx < 0 else (1 if x < cx else 0))
+            f.px([(px_, cy - 1 if gy < 0 else cy)], "o")
+    elif eyes == "open":
         for x in ex:
             f.px([(x, cy-1), (x+1, cy-1), (x, cy), (x+1, cy)], "e")
             f.px([(x + (1 if x < cx else 0), cy)], "o")
@@ -109,7 +117,7 @@ def head_front(f, cx=16, cy=13, eyes="open", ears=1.0):
     f.px([(cx-1, cy+2), (cx, cy+2)], "p")
     f.px([(cx-2, cy+3), (cx-1, cy+4), (cx, cy+4), (cx+1, cy+3)], "o")
 
-def sit(eyes="open", ears=1.0, raise_paw=None):
+def sit(eyes="open", ears=1.0, raise_paw=None, look=None):
     f = Frame()
     f.add(ell(26, 28.5, 4.5, 2.6), B())                   # tail wrapped round
     f.add(ell(16, 24, 11, 8.2), B())                      # big round body
@@ -117,7 +125,7 @@ def sit(eyes="open", ears=1.0, raise_paw=None):
     patch(f, 7, 22, 3.5, 4); patch(f, 25, 26, 3, 3)
     f.add(ell(11.5, 30, 3, 1.8), "w")                     # paws
     f.add(ell(20.5, 30, 3, 1.8), "w")
-    head_front(f, eyes=eyes, ears=ears)
+    head_front(f, eyes=eyes, ears=ears, look=look)
     if raise_paw:
         f.add(ell(*raise_paw, 2.2, 3), "w")
     return f
@@ -227,6 +235,10 @@ def build():
     F["S"] = [front_walk(0), front_walk(1)]
     return F
 
+# Gaze strip: sitting and looking toward the cursor, in this order.
+GAZE = [("N", 0, -1), ("NE", 1, -1), ("E", 1, 0), ("SE", 1, 1),
+        ("S", 0, 1), ("SW", -1, 1), ("W", -1, 0), ("NW", -1, -1)]
+
 GRID = {
     "idle": [(3, 3)], "alert": [(7, 3)], "tired": [(3, 2)],
     "sleeping": [(2, 0), (2, 1)], "scratchSelf": [(5, 0), (6, 0), (7, 0)],
@@ -246,6 +258,10 @@ if __name__ == "__main__":
         for i, (c, r) in enumerate(cells):
             sheet.alpha_composite(F[name][i].render(), (c * 32, r * 32))
     sheet.save(out)
+    gaze = Image.new("RGBA", (256, 32), (0, 0, 0, 0))
+    for i, (_, gx, gy) in enumerate(GAZE):
+        gaze.alpha_composite(sit(look=(gx, gy)).render(), (i * 32, 0))
+    gaze.save(out.replace(".png", "-gaze.png"))
     for bgc, suffix in (((205, 214, 228, 255), "light"), ((40, 44, 52, 255), "dark")):
         big = sheet.resize((1024, 512), Image.NEAREST)
         bg = Image.new("RGBA", big.size, bgc); bg.alpha_composite(big)
