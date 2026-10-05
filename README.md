@@ -113,6 +113,13 @@ window, no onboarding, no Dock icon. Just the cat.
   Right-click the lazy cat to see what it holds and click one to put it back
   on the clipboard; drop files on it to keep them for pasting later; left
   click pets it.
+- **New mail** (lazy cat, off until you turn on "Lazy Cat Watches Your
+  Mail"): reads Apple Mail's inbox across every account set up in Mail,
+  about once a minute and only while Mail is open. When a new message
+  arrives the lazy cat hops, the menu bar shows the unread count, and
+  right-clicking the cat lists the newest unread messages (click one to
+  open it in Mail). Read-only: it never marks, moves or sends anything.
+  macOS asks once for permission to control Mail.
 - **Overlay** — borderless and transparent, above every app, including
   full-screen apps, on all Spaces. The chaser never intercepts a click; the
   lazy cat takes clicks and drops only on its own 32×32 square.
@@ -202,6 +209,7 @@ top -l 3 -pid $(pgrep -x MonsieurPierre) -stats cpu,power,mem
   only), for the lazy cat's window-sitting
 - `Sources/ClipboardHolder.swift` — the lazy cat's last 5 copies and dropped
   files
+- `Sources/MailWatch.swift` — unread mail from Apple Mail, over Apple Events
 - `Sources/CatWindow.swift` — transparent click-through overlay window
 - `Sources/SpriteSheet.swift` — slices the 256×128 sheets into frames; the
   sprite variant catalog (with menu grouping) lives here

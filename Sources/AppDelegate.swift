@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The lazy cat ignores the cursor, naps a lot and wanders now and then.
     private let wander = WanderStrategy()
     private let clipboard = ClipboardHolder()
+    private let mail = MailWatch()
     private let lazyCat: CatController = {
         let screen = NSScreen.main?.visibleFrame ?? .init(x: 0, y: 0, width: 800, height: 600)
         let cat = CatController(position: CGPoint(x: screen.minX + screen.width * 0.25,
@@ -32,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let personalSpace = "personalSpace"
         static let lazyPerches = "lazyCatPerches"
         static let clipboard = "lazyCatHoldsClipboard"
+        static let mail = "lazyCatWatchesMail"
         static let startle = "startle"
         static let reactions = "reactions"
     }
@@ -41,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lazyShowHideItem: NSMenuItem!
     private var perchItem: NSMenuItem!
     private var clipboardItem: NSMenuItem!
+    private var mailItem: NSMenuItem!
     private var horizontalItem: NSMenuItem!
     private var spaceItems: [NSMenuItem] = []
     private var startleItem: NSMenuItem!
@@ -71,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         lazyCat.strategy = wander
         setUpClipboard()
+        setUpMail()
         enableLaunchAtLoginOnFirstRun()
         reconcileLockedDisplay()
         setUpStatusItem()
@@ -85,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !defaults.bool(forKey: Keys.lazyHidden) {
             lazyCat.start()
         }
-        updateClipboard()
+        updateLazyCatFeatures()
         refreshMenuState()
         finishedLaunching = true
         pendingURLs.forEach(handle)
@@ -134,7 +138,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setUpStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        // Variable length so the unread mail count can sit next to the icon.
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.button?.imagePosition = .imageLeft
         // Fallbacks if the bundled icon is missing: cat.fill needs macOS 14,
         // pawprint.fill covers 11.
         if let icon = Self.makeStatusIcon() {
@@ -222,6 +228,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                  action: #selector(togglePerches), keyEquivalent: "")
         clipboardItem = menu.addItem(withTitle: "Lazy Cat Holds Your Clipboard",
                                      action: #selector(toggleClipboard), keyEquivalent: "")
+        mailItem = menu.addItem(withTitle: "Lazy Cat Watches Your Mail",
+                                action: #selector(toggleMail), keyEquivalent: "")
         menu.addItem(withTitle: "Quit Monsieur Pierre", action: #selector(quit), keyEquivalent: "q")
 
         for item in menu.items { item.target = self }
@@ -326,6 +334,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         defaults.object(forKey: Keys.clipboard) as? Bool ?? true
     }
 
+    /// Off until turned on: the first check makes macOS ask for permission
+    /// to control Mail.
+    private var watchesMail: Bool {
+        defaults.bool(forKey: Keys.mail)
+    }
+
     private var reactions: Bool {
         defaults.object(forKey: Keys.reactions) as? Bool ?? true
     }
@@ -365,7 +379,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cat.startles = startles
         cat.reacts = reactions
         wander.perches = lazyPerches
-        updateClipboard()
+        updateLazyCatFeatures()
         cat.variant = spriteVariant
         var strategy: TargetStrategy = defaults.bool(forKey: Keys.horizontal)
             ? HorizontalPinnedStrategy(edge: dockEdge)
@@ -381,6 +395,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lazyShowHideItem.title = lazyCat.isRunning ? "Hide Lazy Cat" : "Show Lazy Cat"
         perchItem.state = lazyPerches ? .on : .off
         clipboardItem.state = holdsClipboard ? .on : .off
+        mailItem.state = watchesMail ? .on : .off
         let horizontal = defaults.bool(forKey: Keys.horizontal)
         horizontalItem.state = horizontal ? .on : .off
         topItem.state = dockEdge == .top ? .on : .off
@@ -427,7 +442,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleLazyShown() {
         lazyCat.isRunning ? lazyCat.stop() : lazyCat.start()
         defaults.set(!lazyCat.isRunning, forKey: Keys.lazyHidden)
-        updateClipboard()
+        updateLazyCatFeatures()
         refreshMenuState()
     }
 
@@ -499,7 +514,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setUpClipboard() {
         clipboard.onSwallow = { [weak self] in self?.lazyCat.bounce() }
         lazyCat.makeInteractive(
-            menu: { [weak self] in self?.clipboardMenu() },
+            menu: { [weak self] in self?.lazyCatMenu() },
             onDrop: { [weak self] urls in
                 guard let self = self, self.holdsClipboard else { return }
                 self.clipboard.add(files: urls)
@@ -508,17 +523,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onClick: { [weak self] in self?.lazyCat.bounce() })
     }
 
-    /// Only while the lazy cat is out: hiding it stops the clipboard watch
-    /// and forgets what it held.
-    private func updateClipboard() {
+    /// Only while the lazy cat is out: hiding it stops the clipboard and
+    /// mail watches and forgets what they held.
+    private func updateLazyCatFeatures() {
         clipboard.isEnabled = holdsClipboard && lazyCat.isRunning
+        mail.isEnabled = watchesMail && lazyCat.isRunning
     }
 
-    private func clipboardMenu() -> NSMenu {
+    /// Right-click on the lazy cat: unread mail first (when watching), then
+    /// what it's holding.
+    private func lazyCatMenu() -> NSMenu {
         let menu = NSMenu()
+        if watchesMail {
+            addMailItems(to: menu)
+            menu.addItem(.separator())
+        }
+        addClipboardItems(to: menu)
+        return menu
+    }
+
+    private func addClipboardItems(to menu: NSMenu) {
         guard holdsClipboard else {
             menu.addItem(withTitle: "Clipboard holding is off", action: nil, keyEquivalent: "")
-            return menu
+            return
         }
         let items = clipboard.items
         menu.addItem(withTitle: items.isEmpty ? "Nothing swallowed yet"
@@ -537,7 +564,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(withTitle: "Forget All", action: #selector(forgetClips),
                          keyEquivalent: "").target = self
         }
-        return menu
     }
 
     @objc private func restoreClip(_ sender: NSMenuItem) {
@@ -546,6 +572,84 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func forgetClips() {
         clipboard.clear()
+    }
+
+    @objc private func toggleMail() {
+        defaults.set(!watchesMail, forKey: Keys.mail)
+        applySettings()
+        refreshMenuState()
+    }
+
+    // MARK: - Mail
+
+    /// The lazy cat perks up when new mail lands in Apple Mail, the menu bar
+    /// shows the unread count, and right-clicking the cat lists the newest
+    /// unread messages to open.
+    private func setUpMail() {
+        mail.onNewMail = { [weak self] in
+            guard let self = self else { return }
+            // Three hops in a row, so it reads as excitement, not a pet.
+            for delay in [0.0, 0.5, 1.0] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    self.lazyCat.bounce()
+                }
+            }
+        }
+        mail.onChange = { [weak self] in self?.showUnreadCount() }
+    }
+
+    private func showUnreadCount() {
+        let count = mail.unreadCount
+        statusItem.button?.title = mail.isEnabled && count > 0 ? " \(count)" : ""
+        statusItem.button?.toolTip = mail.isEnabled && count > 0
+            ? "\(count) unread in Mail" : nil
+    }
+
+    private func addMailItems(to menu: NSMenu) {
+        if let problem = mail.problem {
+            menu.addItem(withTitle: problem, action: nil, keyEquivalent: "")
+        } else if mail.unreadCount == 0 {
+            menu.addItem(withTitle: "No new mail", action: nil, keyEquivalent: "")
+        } else {
+            let count = mail.unreadCount
+            menu.addItem(withTitle: count == 1 ? "1 unread message" : "\(count) unread messages",
+                         action: nil, keyEquivalent: "")
+            // Per-account counts, only when there's more than one account.
+            let accounts = mail.accounts.filter { $0.unread > 0 }
+            if mail.accounts.count > 1 && !accounts.isEmpty {
+                for account in accounts {
+                    let item = menu.addItem(withTitle: "\(account.name): \(account.unread)",
+                                            action: nil, keyEquivalent: "")
+                    item.indentationLevel = 1
+                }
+            }
+            for (index, message) in mail.unread.enumerated() {
+                let item = menu.addItem(withTitle: message.title,
+                                        action: #selector(openMessage(_:)), keyEquivalent: "")
+                item.tag = index
+                item.target = self
+                item.image = NSImage(systemSymbolName: "envelope",
+                                     accessibilityDescription: nil)
+                item.toolTip = "Open in Mail"
+            }
+        }
+        menu.addItem(withTitle: "Open Mail", action: #selector(openMail),
+                     keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Check Now", action: #selector(checkMail),
+                     keyEquivalent: "").target = self
+    }
+
+    @objc private func openMessage(_ sender: NSMenuItem) {
+        guard mail.unread.indices.contains(sender.tag) else { return }
+        mail.open(mail.unread[sender.tag])
+    }
+
+    @objc private func openMail() {
+        mail.openMail()
+    }
+
+    @objc private func checkMail() {
+        mail.check()
     }
 
     @objc private func togglePerches() {

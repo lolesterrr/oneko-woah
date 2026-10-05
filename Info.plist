@@ -31,6 +31,8 @@
 	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>11.0</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Monsieur Pierre reads your unread mail in Apple Mail so the lazy cat can tell you when something new arrives. He never changes or sends anything.</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHighResolutionCapable</key>
