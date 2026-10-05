@@ -144,8 +144,25 @@ final class SpriteSheet {
                                           width: cell, height: cell))
             }
         }
+        // Optional <name>-gaze.png: the sitting cat looking in each of the 8
+        // directions (tools/makegaze.py, tools/makepierre.py), as "gazeN" etc.
+        if let url = Bundle.main.url(forResource: resourceName + "-gaze", withExtension: "png"),
+           let image = NSImage(contentsOf: url),
+           let strip = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+           strip.width == strip.height * 8 {
+            let cell = CGFloat(strip.height)
+            for (i, direction) in Self.gazeOrder.enumerated() {
+                result["gaze" + direction] = strip.cropping(
+                    to: CGRect(x: CGFloat(i) * cell, y: 0, width: cell, height: cell)).map { [$0] }
+            }
+        }
         frames = result
     }
+
+    private static let gazeOrder = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+
+    /// Whether this sheet has frames for watching the cursor.
+    var hasGaze: Bool { frames["gazeN"] != nil }
 
     func frame(_ name: String, _ index: Int) -> CGImage? {
         guard let list = frames[name], !list.isEmpty else { return nil }
