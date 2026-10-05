@@ -1,8 +1,10 @@
 import Foundation
 
-/// The lazy cat's material: cat jokes and dad jokes, bundled so they work
-/// offline. Your own go in ~/Library/Application Support/Monsieur Pierre/
-/// jokes.txt, one per line ("\n" in a line starts a new line in the bubble).
+/// The lazy cat's material: fresh jokes from Reddit when it's reachable
+/// (see `RedditJokes`), and a bundled list of cat jokes and dad jokes for
+/// when it isn't. Your own go in ~/Library/Application Support/
+/// Monsieur Pierre/jokes.txt, one per line ("\n" in a line starts a new
+/// line in the bubble), and are always in the mix.
 enum Jokes {
     static let builtIn: [String] = [
         // Cat jokes
@@ -127,15 +129,130 @@ enum Jokes {
             .map { $0.replacingOccurrences(of: "\\n", with: "\n") }
     }
 
+    /// Filled in by `RedditJokes`; empty when off, offline or not fetched yet.
+    static var reddit: [String] = []
+
     private static var recent: [String] = []
 
-    /// A random joke that hasn't been told in the last 30.
+    /// A random joke that hasn't been told in the last 30: Reddit's when
+    /// there are any, else the built-in ones; plus your own either way.
     static func next() -> String {
-        let pool = builtIn + userJokes
+        let pool = (reddit.isEmpty ? builtIn : reddit) + userJokes
         let fresh = pool.filter { !recent.contains($0) }
         let joke = (fresh.isEmpty ? pool : fresh).randomElement() ?? "…"
         recent.append(joke)
         if recent.count > 30 { recent.removeFirst() }
         return joke
+    }
+}
+
+/// Fetches top posts from clean joke subreddits through Reddit's public JSON
+/// listings, a few times a day. Only short text posts that aren't marked
+/// NSFW or spoiler, aren't pinned and score well make it into the list.
+/// Anything that goes wrong just leaves the built-in jokes in charge.
+final class RedditJokes {
+    var isEnabled = false {
+        didSet {
+            guard isEnabled != oldValue else { return }
+            isEnabled ? start() : stop()
+        }
+    }
+
+    private static let subreddits = ["dadjokes", "cleanjokes", "catpuns"]
+    private static let refresh: TimeInterval = 6 * 60 * 60
+    private static let minScore = 50
+    private static let maxLength = 160
+    private static let blocked = ["http", "[removed]", "[deleted]", "edit:", "r/", "u/", "nsfw"]
+
+    private var timer: Timer?
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 20
+        // Reddit asks API clients for a descriptive User-Agent.
+        config.httpAdditionalHeaders = [
+            "User-Agent": "macos:com.lolesterrr.monsieurpierre:1.0 (desktop cat)",
+        ]
+        return URLSession(configuration: config)
+    }()
+
+    private func start() {
+        fetch()
+        let timer = Timer(timeInterval: Self.refresh, repeats: true) { [weak self] _ in
+            self?.fetch()
+        }
+        timer.tolerance = 600
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    private func stop() {
+        timer?.invalidate()
+        timer = nil
+        Jokes.reddit = []
+    }
+
+    private func fetch() {
+        let group = DispatchGroup()
+        var collected: [String] = []
+        let lock = NSLock()
+        for name in Self.subreddits {
+            guard let url = URL(string: "https://www.reddit.com/r/\(name)/top.json?t=month&limit=100&raw_json=1")
+            else { continue }
+            group.enter()
+            session.dataTask(with: url) { data, response, error in
+                defer { group.leave() }
+                guard let data = data, error == nil,
+                      (response as? HTTPURLResponse)?.statusCode == 200
+                else {
+                    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    let reason = error?.localizedDescription ?? "HTTP \(status)"
+                    NSLog("Reddit jokes from r/\(name) failed: \(reason)")
+                    return
+                }
+                let jokes = Self.parse(data)
+                lock.lock()
+                collected += jokes
+                lock.unlock()
+            }.resume()
+        }
+        group.notify(queue: .main) { [weak self] in
+            // Keep the last good batch when a refresh comes back empty.
+            guard let self = self, self.isEnabled, !collected.isEmpty else { return }
+            Jokes.reddit = collected
+        }
+    }
+
+    private struct Listing: Decodable {
+        struct Child: Decodable { let data: Post }
+        struct Page: Decodable { let children: [Child] }
+        let data: Page
+    }
+
+    private struct Post: Decodable {
+        let title: String
+        let selftext: String?
+        let over_18: Bool?
+        let spoiler: Bool?
+        let stickied: Bool?
+        let is_self: Bool?
+        let score: Int?
+    }
+
+    private static func parse(_ data: Data) -> [String] {
+        guard let listing = try? JSONDecoder().decode(Listing.self, from: data) else { return [] }
+        return listing.data.children.compactMap { child in
+            let post = child.data
+            guard post.over_18 != true, post.spoiler != true, post.stickied != true,
+                  post.is_self != false, (post.score ?? 0) >= minScore
+            else { return nil }
+            let title = post.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let body = (post.selftext ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let joke = body.isEmpty ? title : title + "\n" + body
+            let lower = joke.lowercased()
+            guard !title.isEmpty, joke.count <= maxLength,
+                  !blocked.contains(where: { lower.contains($0) })
+            else { return nil }
+            return joke
+        }
     }
 }
