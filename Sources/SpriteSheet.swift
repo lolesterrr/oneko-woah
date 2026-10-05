@@ -22,6 +22,10 @@ struct SpriteVariant: Hashable {
     var resourceName: String { rawValue == "cat" ? "oneko" : rawValue }
 
     static let cat = SpriteVariant("cat", "Cat")
+    /// The lazy cat's own sheets, drawn by tools/makepierre.py. Not in the
+    /// skin menu: they belong to the lazy cat.
+    static let pierre = SpriteVariant("pierre", "Monsieur Pierre")
+    static let pierreCow = SpriteVariant("pierre-cow", "Monsieur Pierre (cow)")
 
     /// Menu grouping: the two sheets bundled since the first release, the
     /// remaining characters of the original X11 oneko, and community art.

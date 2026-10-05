@@ -86,9 +86,10 @@ compatible with it.
 Everything lives in the menu bar item (cat icon) — there is no settings
 window, no onboarding, no Dock icon. Just the cat.
 
-- **Two cats**: the chaser follows your cursor; the lazy cat ignores it,
-  naps a lot and strolls to a new spot on its screen every few minutes. Show
-  or hide each one from the menu.
+- **Two cats**: the chaser follows your cursor; the lazy cat, Monsieur
+  Pierre (a fat black-and-white tuxedo cat), ignores it, naps a lot and
+  strolls to a new spot on its screen every few minutes. Show or hide each
+  one from the menu.
 - **Click-through overlay** — borderless and transparent; the cat never
   intercepts a click and renders above every app, including full-screen apps,
   on all Spaces.
@@ -181,6 +182,8 @@ top -l 3 -pid $(pgrep -x MonsieurPierre) -stats cpu,power,mem
 - `Sources/LoginItem.swift` — launch at login: `SMAppService` on macOS 13+,
   a LaunchAgent on macOS 11 and 12
 - `Resources/*.png` — the 27 sprite sheets, all in the oneko.js 256×128 layout
+- `tools/makepierre.py` — draws the lazy cat's sheets (`pierre.png`,
+  `pierre-cow.png`) from code; needs Python 3 with Pillow
 - `tools/makesheet.swift` — builds a sheet from the original X11 oneko XBM
   bitmaps + transparency masks, for any animal in the oneko sources
 - `tools/makepreviews.swift` — regenerates the animated README previews in
